@@ -1,0 +1,58 @@
+#pragma kernel Subdivide
+
+RWStructuredBuffer<float3> Verts;
+RWStructuredBuffer<int> Indices;
+
+float3 FirstCorner;
+float3 ToSecondCorner;
+float3 ToThirdCorner;
+
+unsigned int NumVerts;
+
+unsigned int Subdivisions;
+
+int FirstTriLen;
+
+[numthreads(32, 32, 1)]
+void Subdivide(uint2 id : SV_DispatchThreadID)
+{
+    if (id.x > Subdivisions + 2 || id.y > Subdivisions + 2) {
+        return;
+    }
+
+    if (id.y < Subdivisions + 2 - id.x)
+    {
+        // Vertices
+        float3 StartCorner = FirstCorner + ToThirdCorner * id.x;
+        int tmpIdx = 0;
+        for (unsigned int i = 0; i < id.x; i++)
+        {
+            tmpIdx += Subdivisions + 2 - i;
+        }
+        Verts[id.y + tmpIdx] = StartCorner + ToSecondCorner * id.y;
+
+
+        
+        // Indices
+        unsigned int Idx = id.y + tmpIdx;
+        if (Idx > Subdivisions+1)
+        {
+            unsigned int TriIdx = Idx - (Subdivisions + 2);
+            Indices[TriIdx * 3 + 0] = Idx;
+            Indices[TriIdx * 3 + 1] = Idx - (Subdivisions + 2 - id.x + 1);
+            Indices[TriIdx * 3 + 2] = Idx - (Subdivisions + 2 - id.x + 1) + 1;
+
+
+            unsigned int InvIDX = (Subdivisions+1) - (id.x);
+            unsigned int NextEnd = NumVerts - ((InvIDX) * (InvIDX+1))/2 - 1;
+
+            if (Idx != NextEnd)
+            {
+                TriIdx = FirstTriLen + Idx - (Subdivisions + 2) - (id.x-1);
+                Indices[TriIdx * 3 + 0] = Idx;
+                Indices[TriIdx * 3 + 1] = Idx - (Subdivisions + 2 - id.x + 1) + 1;
+                Indices[TriIdx * 3 + 2] = Idx + 1;
+            }
+        }
+    }
+}

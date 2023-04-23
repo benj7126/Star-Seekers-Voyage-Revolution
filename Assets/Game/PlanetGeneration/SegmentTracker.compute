@@ -1,0 +1,21 @@
+ #pragma kernel Track
+
+StructuredBuffer<float3> Verts;
+RWStructuredBuffer<int> LODs;
+
+float3 CamPos; // = CamPos - PlanetCenter
+
+[numthreads(512, 1, 1)]
+void Track (uint id : SV_DispatchThreadID)
+{
+    float dist = length(Verts[id] - CamPos);
+
+    if (dist < 30)
+        LODs[id] = 3;
+    else if (dist < 2000)
+        LODs[id] = 2;
+    else if (dist < 20000)
+        LODs[id] = 1;
+    else
+        LODs[id] = 0;
+}

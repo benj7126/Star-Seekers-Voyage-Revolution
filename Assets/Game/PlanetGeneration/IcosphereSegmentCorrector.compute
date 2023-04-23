@@ -1,0 +1,71 @@
+// https://polycoding.net/compute-shaders-unity
+
+#pragma kernel ComputeHeight
+
+#include "Assets/Game/Noise.compute"
+
+#define sn(x) ((snoise(x)+1)/2)
+
+RWStructuredBuffer<float3> Verts;
+
+uint VertsAmount;
+float DefaultHeight;
+float3 Center;
+
+[numthreads(512, 1, 1)]
+void ComputeHeight(uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= VertsAmount)
+		return;
+
+	// most comments are the things that should have variables...
+	
+	Verts[id.x] = normalize(Verts[id.x]);
+
+	float3 NoiseOrigin = Verts[id.x] + Center;
+
+	float Height = 1;
+
+	//
+	// Ocean
+	float3 OceanNoiseOrigin = (NoiseOrigin) * 2; // 2 : frequency of mountain noise stuff
+	float OceanDepth = min(snoise(OceanNoiseOrigin), 0);
+	OceanDepth = max(OceanDepth, -1 + 0.4); // 0.3 : floor lvl ig
+	
+	// Ocean
+	//
+
+	//
+	// HillNoise
+
+	float3 HillNoiseOrigin = (NoiseOrigin + float3(100, 0, 0))*4; // 4 : frequency of hill noise stuff
+	float HillNoise = sn(HillNoiseOrigin) + sn(HillNoiseOrigin*2)/2 + sn(HillNoiseOrigin*4)/4;
+	HillNoise /= (1+0.5+0.25);
+	
+	// HillNoise
+	//
+	
+	//
+	// MOUNTAINS
+
+	float3 MountainNoiseOrigin = (NoiseOrigin + float3(200, 0, 0))*3; // 3 : frequency of mountain noise stuff
+	float MountainHeight = sn(MountainNoiseOrigin) + sn(MountainNoiseOrigin*2)/2 + sn(MountainNoiseOrigin*4)/4 + sn(MountainNoiseOrigin*8)/8;
+	MountainHeight /= (1+0.5+0.25+0.125);
+
+	MountainHeight = pow(MountainHeight+0.2, 6); // 0.2 and 6 should also be var ig...
+	
+	float3 MountainMaskNoiseOrigin = NoiseOrigin*1; // 1 : frequency of mountain mask noise stuff
+	float MountainMask = min(sn(MountainMaskNoiseOrigin)*3, 1); // 3 : lower is more mountains(and a little higher ig) higher is less mountains
+
+	// MOUNTAINS
+	//
+
+	// all below also needs var from outside shader...
+	float MountainEffect = 0.3;
+	float HillEffect = 0.1;
+	float OceanEffect = 0.2;
+	
+	Height += (HillNoise * HillEffect) + (MountainHeight * (1-MountainMask) * MountainEffect) + (OceanDepth * OceanEffect);
+	
+	Verts[id.x] = Verts[id.x] * DefaultHeight * Height;
+}
